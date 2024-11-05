@@ -98,6 +98,10 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
     def after_create(self, context, resource_dict):
         '''Required by IResourceController'''
         pass
+        
+    def after_resource_delete(self, context, resource_dict):
+        '''Required by IResourceController'''
+        pass
 
     def after_delete(self, context, resource_dict):
         '''Required by IResourceController'''
