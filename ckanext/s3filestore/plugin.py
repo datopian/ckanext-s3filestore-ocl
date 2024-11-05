@@ -125,6 +125,6 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
             if rs.get('id') == resource.get('id'):
                 ckanext.s3filestore.uploader.delete_from_bucket(rs)
 
-    def before_resource_delete(self, context, resource_dict):
+    def before_resource_delete(self, context, resource, resources):
         '''Required by IResourceController'''
         pass
