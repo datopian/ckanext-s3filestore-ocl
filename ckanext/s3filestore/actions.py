@@ -25,8 +25,7 @@ def get_signed_url(context: Context, data_dict: DataDict) -> AuthResult:
         "url_type": url_type,
     })
     key_path = upload.get_path(id, filename)
-    if upload.owner_org:
-        key_path = os.path.join(upload.owner_org, key_path)
+
     print("Generated signed URL for:", key_path, flush=True)
     print(key_path, flush=True)
     return {
