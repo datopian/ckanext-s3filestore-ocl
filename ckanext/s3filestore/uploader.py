@@ -61,8 +61,8 @@ class BaseS3Uploader(object):
         self.addressing_style = \
             config.get('ckanext.s3filestore.addressing_style', 'auto')
         self.signed_url_expiry = \
-            int(config.get('ckanext.s3filestore.signed_url_expiry', '60')) 
-            # Keep the default url expiry as 60 so that same URL cannot be reused
+            int(config.get('ckanext.s3filestore.signed_url_expiry', '60'))
+        # Keep the default url expiry as 60 so that same URL cannot be reused
 
     def get_directory(self, id, storage_path):
         directory = os.path.join(storage_path, id)
@@ -106,7 +106,8 @@ class BaseS3Uploader(object):
         try:
             # Validate the bucket when key doesn't have list bucket permission
             # By Putting the data into the bucket
-            s3.meta.client.put_object(Bucket=bucket_name,Body='exist',Key='exist.txt')
+            s3.meta.client.put_object(
+                Bucket=bucket_name, Body='exist', Key='exist.txt')
             log.debug('Bucket {0} found!'.format(bucket_name))
         except botocore.exceptions.ClientError as e:
             error_code = int(e.response['Error']['Code'])
@@ -250,7 +251,8 @@ class S3Uploader(BaseS3Uploader):
             self.filename = self.upload_field_storage.filename
             self.filename = str(datetime.datetime.utcnow()) + self.filename
             self.filename = munge.munge_filename_legacy(self.filename)
-            self.mimetype = mimetypes.guess_type(self.filename, strict=False)[0]
+            self.mimetype = mimetypes.guess_type(
+                self.filename, strict=False)[0]
             self.filepath = os.path.join(self.storage_path, self.filename)
             data_dict[url_field] = self.filename
             self.upload_file = _get_underlying_file(self.upload_field_storage)
@@ -411,6 +413,21 @@ class S3ResourceUploader(BaseS3Uploader):
             log.warning('Key {0} not found in bucket {1} for delete'
                         .format(key_path, self.bucket_name))
             pass
+
+
+def generate_put_presigned_url(self, key, extra_params={}):
+    '''
+    Generates a pre-signed URL for HTTP PUT to upload an S3 object.
+    '''
+    client = self.get_s3_client()
+    params = {'Bucket': self.bucket_name,
+              'Key': key
+              }
+    params.update(extra_params)
+    url = client.generate_presigned_url(ClientMethod='put_object',
+                                        Params=params,
+                                        ExpiresIn=self.signed_url_expiry)
+    return url
 
 
 def delete_from_bucket(data_dict):

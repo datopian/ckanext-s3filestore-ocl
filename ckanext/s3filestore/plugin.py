@@ -2,21 +2,23 @@
 import ckan.plugins as plugins
 import ckantoolkit as toolkit
 
+from ckanext.s3filestore.actions import get_signed_url
 import ckanext.s3filestore.uploader
 from ckanext.s3filestore.views import resource, uploads
 from ckanext.s3filestore.click_commands import upload_resources
-
+from ckan.types import Action, AuthFunction, Context, DataDict, AuthResult
 
 class S3FileStorePlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.IConfigurable)
     plugins.implements(plugins.IUploader)
+    plugins.implements(plugins.IActions)
+    plugins.implements(plugins.IAuthFunctions)
     plugins.implements(plugins.IBlueprint)
     plugins.implements(plugins.IClick)
     plugins.implements(plugins.IResourceController)
 
     # IConfigurer
-
     def update_config(self, config_):
         toolkit.add_template_directory(config_, 'templates')
         # We need to register the following templates dir in order
@@ -52,7 +54,6 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
                 config.get('ckanext.s3filestore.aws_bucket_name'))
 
     # IUploader
-
     def get_resource_uploader(self, data_dict):
         '''Return an uploader object used to upload resource files.'''
         return ckanext.s3filestore.uploader.S3ResourceUploader(data_dict)
@@ -63,16 +64,28 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
                                                        old_filename)
 
     # IBlueprint
-
     def get_blueprint(self):
         blueprints = resource.get_blueprints() +\
-                     uploads.get_blueprints()
+            uploads.get_blueprints()
         return blueprints
 
     # IClick
-
     def get_commands(self):
         return [upload_resources]
+
+    # IAuthFunctions
+    def get_auth_functions(self) -> dict[str, AuthFunction]:
+        def get_signed_url(context: Context, data_dict: DataDict) -> AuthResult:
+            return toolkit.check_access("package_create", context, data_dict)
+        return {
+            "get_signed_url": get_signed_url
+        }
+
+    # IActions
+    def get_actions(self):
+        return {
+            'get_signed_url': get_signed_url
+        }
 
     # IResourceController
     def before_resource_create(self, context, resource_dict):
@@ -82,7 +95,7 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
     def before_create(self, context, resource_dict):
         '''Required by IResourceController'''
         pass
-    
+
     def before_resource_show(self, resource_dict):
         '''Required by IResourceController'''
         pass
@@ -90,7 +103,7 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
     def before_show(self, resource_dict):
         '''Required by IResourceController'''
         pass
-    
+
     def after_resource_create(self, context, resource_dict):
         '''Required by IResourceController'''
         pass
@@ -98,7 +111,7 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
     def after_create(self, context, resource_dict):
         '''Required by IResourceController'''
         pass
-        
+
     def after_resource_delete(self, context, resource_dict):
         '''Required by IResourceController'''
         pass
