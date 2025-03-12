@@ -68,6 +68,20 @@ class BaseS3Uploader(object):
         directory = os.path.join(storage_path, id)
         return directory
 
+    def generate_put_presigned_url(self, key, extra_params={}):
+        '''
+        Generates a pre-signed URL for HTTP PUT to upload an S3 object.
+        '''
+        client = self.get_s3_client()
+        params = {'Bucket': self.bucket_name,
+                'Key': key
+                }
+        params.update(extra_params)
+        url = client.generate_presigned_url(ClientMethod='put_object',
+                                            Params=params,
+                                            ExpiresIn=self.signed_url_expiry)
+        return url
+
     def get_s3_session(self, read_only=False):
         if read_only:
             return boto3.session.Session(aws_access_key_id=self.p_key_readonly,
@@ -413,21 +427,6 @@ class S3ResourceUploader(BaseS3Uploader):
             log.warning('Key {0} not found in bucket {1} for delete'
                         .format(key_path, self.bucket_name))
             pass
-
-
-def generate_put_presigned_url(self, key, extra_params={}):
-    '''
-    Generates a pre-signed URL for HTTP PUT to upload an S3 object.
-    '''
-    client = self.get_s3_client()
-    params = {'Bucket': self.bucket_name,
-              'Key': key
-              }
-    params.update(extra_params)
-    url = client.generate_presigned_url(ClientMethod='put_object',
-                                        Params=params,
-                                        ExpiresIn=self.signed_url_expiry)
-    return url
 
 
 def delete_from_bucket(data_dict):
