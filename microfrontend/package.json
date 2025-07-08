@@ -64,7 +64,7 @@
   },
   "scripts": {
     "start": "npm run tailwind-dev & react-scripts start",
-    "build": "NODE_ENV=production GENERATE_SOURCEMAP=false react-scripts build && mv ./build/static/js/main.*.js ../ckanext/s3filestore/assets/microfrontend/main.js && mv ./build/static/css/main.*.css ../ckanext/s3filestore/assets/microfrontend/main.css",
+    "build": "NODE_ENV=production GENERATE_SOURCEMAP=false react-scripts build && mv ./build/static/js/main.*.js ../ckanext/s3filestore/assets/microfrontend/main.js && mv ./build/static/css/main.*.css ../ckanext/s3filestore/assets/microfrontend/main.css && mv ./build/static/ ../ckanext/s3filestore/public/",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "tailwind-dev": "tailwindcss -i ./src/index.css -o ./src/tailwind.css --watch",
