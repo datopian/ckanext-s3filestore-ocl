@@ -2,7 +2,6 @@ microfrontend-css:
   output: s3filestore/css/main.min.css
   contents:
     - microfrontend/main.css
-    - microfrontend/extra.css
 
 microfrontend-js:
   filters: rjsmin

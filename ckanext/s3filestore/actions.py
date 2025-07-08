@@ -1,19 +1,16 @@
 import logging
 from ckan.types import Context, DataDict, AuthResult
 from ckan.model.types import make_uuid
-import ckan.logic as logic
 import ckan.lib.uploader as uploader
-import os
 import ckan.plugins.toolkit as toolkit
 from botocore.exceptions import ClientError
+from ckan.common import _
+from ckan.logic import ValidationError, NotAuthorized, NotFound
 
-ValidationError = logic.ValidationError
 log = logging.getLogger(__name__)
 
 @toolkit.chained_action
 def resource_create(up_func, context: Context, data_dict: DataDict):
-    log.info('TESTING 123')
-    log.info(data_dict)
     res = up_func(context, data_dict)
     res['url'] = res['url'].replace("REPLACE_HERE", res['id'])
     toolkit.get_action('resource_update')(context, res)
@@ -21,31 +18,87 @@ def resource_create(up_func, context: Context, data_dict: DataDict):
 
 def get_signed_url(context: Context, data_dict: DataDict) -> AuthResult:
     """Generate a signed URL for single file upload"""
+
+    user = context.get('user')
+    if not user:
+        raise NotAuthorized(_('You must be logged in to upload files'))
+    
     package_id = data_dict.get("package_id", None)
     filename = data_dict.get("filename", None)
 
     if package_id is None:
-        raise ValidationError({"package_id": "Package ID is required"})
+        raise ValidationError({"package_id": _("Package ID is required")})
     if filename is None:
-        raise ValidationError({"filename": "Filename is required"})
+        raise ValidationError({"filename": _("Filename is required")})
+
+    try:
+        toolkit.get_action('package_show')(context, {'id': package_id})
+    except NotFound:
+        raise NotFound(_('Package not found'))
+    except NotAuthorized:
+        raise NotAuthorized(_('You are not authorized to access this package'))
+
+    try:
+        toolkit.check_access('resource_create', context, {'package_id': package_id})
+    except NotAuthorized:
+        raise NotAuthorized(_('You are not authorized to create resources for this package'))
+
+    if not _is_valid_filename(filename):
+        raise ValidationError({"filename": _("Invalid filename")})
 
     url_type = 'upload'
     resource_id = make_uuid()
 
-    upload = uploader.get_resource_uploader({
-        "package_id": package_id,
-        "resource_id": resource_id,
-        "url_type": url_type,
-    })
+    try:
+        upload = uploader.get_resource_uploader({
+            "package_id": package_id,
+            "resource_id": resource_id,
+            "url_type": url_type,
+        })
 
-    key_path = upload.get_path(resource_id, filename)
+        key_path = upload.get_path(resource_id, filename)
+        signed_url = upload.generate_put_presigned_url(key_path)
+        
+        log.info(f"Generated signed URL for user {user} on package {package_id}: {key_path}")
+
+        return {
+            "resource_id": resource_id,
+            "signed_url": signed_url,
+        }
     
-    log.info(f"Generated signed URL for: {key_path}")
+    except Exception as e:
+        log.error(f"Failed to generate signed URL: {str(e)}")
+        raise ValidationError({"upload": _("Failed to generate upload URL")})
 
-    return {
-        "resource_id": resource_id,
-        "signed_url": upload.generate_put_presigned_url(key_path),
-    }
+
+def _is_valid_filename(filename: str) -> bool:
+    """
+    Validate filename to prevent security issues
+    """
+    import os
+    import re
+    
+    # Basic checks
+    if not filename or len(filename) > 255:
+        return False
+    
+    # Check for dangerous characters or patterns
+    dangerous_patterns = [
+        r'\.\./',  # Path traversal
+        r'[<>:"|?*]',  # Invalid characters
+        r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)',  # Windows reserved names
+    ]
+    
+    for pattern in dangerous_patterns:
+        if re.search(pattern, filename, re.IGNORECASE):
+            return False
+    
+    # Check file extension if needed (optional - depends on your requirements)
+    # allowed_extensions = ['.csv', '.json', '.xml', '.txt', '.pdf', '.xlsx']
+    # if not any(filename.lower().endswith(ext) for ext in allowed_extensions):
+    #     return False
+    
+    return True
 
 
 @toolkit.side_effect_free
