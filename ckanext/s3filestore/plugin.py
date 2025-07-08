@@ -2,7 +2,17 @@
 import ckan.plugins as plugins
 import ckantoolkit as toolkit
 
-from ckanext.s3filestore.actions import get_signed_url
+from ckanext.s3filestore.helpers import get_or_create_user_api_key_safe, get_package_by_name
+from ckanext.s3filestore.actions import (
+    get_signed_url,
+    create_multipart_upload,
+    prepare_upload_parts,
+    complete_multipart_upload,
+    resource_create,
+    list_parts,
+    abort_multipart_upload,
+    sign_part,
+)
 import ckanext.s3filestore.uploader
 from ckanext.s3filestore.views import resource, uploads
 from ckanext.s3filestore.click_commands import upload_resources
@@ -13,6 +23,7 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurable)
     plugins.implements(plugins.IUploader)
     plugins.implements(plugins.IActions)
+    plugins.implements(plugins.ITemplateHelpers)
     plugins.implements(plugins.IAuthFunctions)
     plugins.implements(plugins.IBlueprint)
     plugins.implements(plugins.IClick)
@@ -20,14 +31,11 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
 
     # IConfigurer
     def update_config(self, config_):
-        toolkit.add_template_directory(config_, 'templates')
-        # We need to register the following templates dir in order
-        # to fix downloading the HTML file instead of previewing when
-        # 'webpage_view' is enabled
-        toolkit.add_template_directory(config_, 'theme/templates')
+        toolkit.add_template_directory(config_, "templates")
+        toolkit.add_public_directory(config_, "public")
+        toolkit.add_resource("assets", "s3filestore")
 
     # IConfigurable
-
     def configure(self, config):
         # Certain config options must exists for the plugin to work. Raise an
         # exception if they're missing.
@@ -75,16 +83,59 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
 
     # IAuthFunctions
     def get_auth_functions(self) -> dict[str, AuthFunction]:
-        def get_signed_url(context: Context, data_dict: DataDict) -> AuthResult:
+        def get_signed_url_auth(context: Context, data_dict: DataDict) -> AuthResult:
             return toolkit.check_access("package_create", context, data_dict)
+        
+        def create_multipart_upload_auth(context: Context, data_dict: DataDict) -> AuthResult:
+            return toolkit.check_access("package_create", context, data_dict)
+        
+        def prepare_upload_parts_auth(context: Context, data_dict: DataDict) -> AuthResult:
+            return toolkit.check_access("package_create", context, data_dict)
+        
+        def complete_multipart_upload_auth(context: Context, data_dict: DataDict) -> AuthResult:
+            return toolkit.check_access("package_create", context, data_dict)
+        
+        def list_parts_auth(context: Context, data_dict: DataDict) -> AuthResult:
+            return toolkit.check_access("package_create", context, data_dict)
+        
+        def abort_multipart_upload_auth(context: Context, data_dict: DataDict) -> AuthResult:
+            return toolkit.check_access("package_create", context, data_dict)
+        
+        def sign_part_auth(context: Context, data_dict: DataDict) -> AuthResult:
+            return toolkit.check_access("package_create", context, data_dict)
+        
+        def handle_upload_endpoint_auth(context: Context, data_dict: DataDict) -> AuthResult:
+            return toolkit.check_access("package_create", context, data_dict)
+        
         return {
-            "get_signed_url": get_signed_url
+            "get_signed_url": get_signed_url_auth,
+            "create_multipart_upload": create_multipart_upload_auth,
+            "prepare_upload_parts": prepare_upload_parts_auth,
+            "complete_multipart_upload": complete_multipart_upload_auth,
+            "list_parts": list_parts_auth,
+            "abort_multipart_upload": abort_multipart_upload_auth,
+            "sign_part": sign_part_auth,
+            "handle_upload_endpoint": handle_upload_endpoint_auth,
         }
 
     # IActions
     def get_actions(self):
         return {
-            'get_signed_url': get_signed_url
+            'get_signed_url': get_signed_url,
+            'create-multipart-upload': create_multipart_upload,
+            'prepare-upload-parts': prepare_upload_parts,
+            'resource_create': resource_create,
+            'complete-multipart-upload': complete_multipart_upload,
+            'list-parts': list_parts,
+            'abort-multipart-upload': abort_multipart_upload,
+            'sign-part': sign_part,
+        } 
+    
+    # ITemplateHelpers
+    def get_helpers(self):
+        return {
+            'get_package_by_name': get_package_by_name,
+            'user_api_key': get_or_create_user_api_key_safe,
         }
 
     # IResourceController

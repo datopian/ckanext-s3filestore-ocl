@@ -1,0 +1,120 @@
+{% ckan_extends %}
+
+{% set is_upload=is_upload %}
+{% macro remove_button(js='') %}
+  <button type="button" class="btn btn-danger btn-remove-url"
+    onclick="
+      document.getElementById('resource-url-none').checked = true;
+      document.getElementById('{{ first_button }}').focus();
+      this.style.position = 'initial';
+      {{ js }}
+    ">{{ _('Remove') }}</button>
+{% endmacro %}
+{% import "macros/form.html" as form %}
+{% asset 's3filestore/microfrontend-css' %} 
+{% set pkg = h.get_package_by_name(pkg_name) %}
+{% set is_url=data.url and not is_upload %}
+{% set is_upload_enabled=h.uploads_enabled() %}
+{% set url_label=_('URL') %}
+{% set upload_label=_('File') %}
+{% set placeholder=_('http://example.com/external-data.csv') %}
+{% set first_button = 'resource-upload-button' if is_upload_enabled else 'resource-link-button' %}
+
+{% block basic_fields_url %} 
+<div data-module="resource-upload-field" class="resource-upload-field form-group">
+  <input type="radio" id="resource-url-none" name="url_type" value="" {{
+    'checked' if not data.url and not data.url_type else '' }}>
+  <div class="select-type">
+    <label id="resource-menu-label" class="form-label"
+      >{{ menu_label or _('Data') }}</label>
+    <div role="group" aria-labelledby="resource-menu-label">
+      {% block url_type_select %}
+        {% if is_upload_enabled %}
+          <button type="button" class="btn btn-default" id="resource-upload-button"
+            title="{{ _('Upload a file on your computer') }}"
+            onclick="
+                            for (let x of document.querySelectorAll('.btn.btn-danger.btn-remove-url')){x.style.position = 'initial';}
+
+              document.getElementById('resource-url-upload').checked = true;
+              document.getElementById('field-resource-upload').click();
+            "autofocus="true"><i class="fa fa-cloud-upload"></i>{{ _("Upload") }}</button>
+        {% endif %}
+        <button type="button" class="btn btn-default" id="resource-link-button"
+          title="{{ _('Link to a URL on the internet (you can also link to an API)') }}"
+            onclick="
+              for (let x of document.querySelectorAll('.btn.btn-danger.btn-remove-url')){x.style.position = 'absolute';}
+              document.getElementById('resource-url-link').checked = true;
+              document.getElementById('field-resource-url').focus();
+            "><i class="fa fa-globe"></i>{{ _('Link') }}</button>
+      {% endblock %}
+    </div>
+  </div>
+
+  {% block url_type_fields %}
+    {% if is_upload_enabled %}
+      <input type="radio" id="resource-url-upload" name="url_type" value="upload" {{
+        'checked' if is_upload else '' }}>
+      <div class="select-type">
+        {% block upload_controls %}
+          {% if is_upload %}
+            {# for existing uploads we show the file name in a readonly input box #}
+            
+            <input type="checkbox" id="field-clear-upload" value="true">
+            <div class="upload-type upload-section" style="
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+">
+              <button type="button" class="btn btn-danger btn-remove-url"
+                onclick="
+                  document.getElementById('field-clear-upload').checked = true;
+                  document.getElementById('field-resource-upload').focus();
+                  this.style.position = 'initial';
+                ">{{ _('Clear Upload') }}</button>
+              <label class="form-label">{{ upload_label or _('File') }}</label>
+              <div class="controls">
+                {% set existing_name = data.get('url', '').split('/')[-1].split('?')[0].split('#')[0] %}
+                <input value="{{ existing_name }}" class="form-control" readonly>
+              </div>
+            </div>
+          {% endif %}
+          <div class="upload-type upload-section" style="
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+">
+            {{ remove_button(
+              js="$('#field-resource-upload').replaceWith($('#field-resource-upload').val('').clone(true))") }}
+            <div
+              id="ResourceUploader"
+              data-dataset-id="{{ pkg.id }}"
+              data-organization-id="{{ pkg.organization.id }}"
+              data-auth-token="{{ h.user_api_key() }}"
+              data-resource-id="{{ data.id }}"
+            ></div>
+          </div>
+        {% endblock %}
+      </div>
+    {% endif %}
+
+    <input type="radio" id="resource-url-link" name="url_type" value="" {{
+      'checked' if is_url else '' }}>
+    <div class="select-type">
+      {% block link_controls %}
+        {{ remove_button(
+          js="$('#field-resource-url').val('')") }}
+        {{ form.input(
+          'url',
+          label=url_label or _('URL'),
+          id='field-resource-url',
+          type='url',
+          placeholder=placeholder,
+          value=data.get('url'),
+          error=errors.get('url'),
+          classes=['control-full']) }}
+      {% endblock %}
+    </div>
+  {% endblock %}
+</div>
+{% asset 's3filestore/microfrontend-js' %}
+{% endblock %}

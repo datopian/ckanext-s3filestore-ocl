@@ -1,0 +1,96 @@
+{
+  "name": "microfrontend-react-app",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.410.0",
+    "@aws-sdk/s3-request-presigner": "^3.410.0",
+    "@uppy/aws-s3": "^3.3.0",
+    "crypto-hash": "^2.0.1",
+    "next": "latest",
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@codemirror/lang-json": "^6.0.1",
+    "@githubocto/flat-ui": "^0.14.1",
+    "@hookform/resolvers": "^3.5.0",
+    "@maskito/core": "^3.2.0",
+    "@maskito/react": "^3.2.0",
+    "@radix-ui/react-accordion": "^1.1.2",
+    "@radix-ui/react-alert-dialog": "^1.0.5",
+    "@radix-ui/react-checkbox": "^1.0.4",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-label": "^2.0.2",
+    "@radix-ui/react-popover": "^1.0.7",
+    "@radix-ui/react-select": "^2.0.0",
+    "@radix-ui/react-slot": "^1.0.2",
+    "@radix-ui/react-tooltip": "^1.1.2",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "@types/jest": "^27.5.2",
+    "@types/node": "^16.18.98",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^9.0.8",
+    "@uiw/react-codemirror": "^4.22.2",
+    "@uppy/aws-s3-multipart": "^4.0.0",
+    "@uppy/core": "^3.12.0",
+    "@uppy/dashboard": "^3.8.3",
+    "@uppy/drag-drop": "^3.1.0",
+    "@uppy/dropbox": "^3.3.1",
+    "@uppy/file-input": "^3.1.2",
+    "@uppy/progress-bar": "^3.1.1",
+    "@uppy/react": "^3.3.1",
+    "@uppy/status-bar": "^3.3.3",
+    "@uppy/tus": "^3.5.5",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.0.0",
+    "date-fns": "^3.6.0",
+    "lucide-react": "^0.383.0",
+    "papaparse": "^5.4.1",
+    "react": "^18.3.1",
+    "react-day-picker": "^9.4.0",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.51.5",
+    "react-scripts": "5.0.1",
+    "slugify": "^1.6.6",
+    "source-map-explorer": "^2.5.3",
+    "swr": "^2.2.5",
+    "tailwind-merge": "^2.3.0",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^4.9.5",
+    "web-vitals": "^2.1.4",
+    "zod": "^3.23.8"
+  },
+  "scripts": {
+    "start": "npm run tailwind-dev & react-scripts start",
+    "build": "NODE_ENV=production GENERATE_SOURCEMAP=false react-scripts build && mv ./build/static/js/main.*.js ../ckanext/s3filestore/assets/microfrontend/main.js && mv ./build/static/css/main.*.css ../ckanext/s3filestore/assets/microfrontend/main.css",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "tailwind-dev": "tailwindcss -i ./src/index.css -o ./src/tailwind.css --watch",
+    "analyze": "NODE_ENV=production react-scripts build && source-map-explorer './build/static/js/*.js' --json"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@types/papaparse": "^5.3.15",
+    "tailwindcss": "^3.4.4",
+    "tailwindcss-scoped-preflight": "^3.4.10"
+  }
+}

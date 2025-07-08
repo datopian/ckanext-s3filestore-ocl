@@ -17,7 +17,6 @@ import ckan.lib.munge as munge
 
 if toolkit.check_ckan_version(min_version='2.7.0'):
     from werkzeug.datastructures import FileStorage as FlaskFileStorage
-
     ALLOWED_UPLOAD_TYPES = (cgi.FieldStorage, FlaskFileStorage)
 else:
     ALLOWED_UPLOAD_TYPES = cgi.FieldStorage
@@ -207,6 +206,179 @@ class BaseS3Uploader(object):
             url = URL_HOST.sub(self.download_proxy + '/', url, 1)
 
         return url
+
+    # =============================================================================
+    # MULTIPART UPLOAD METHODS - NEW ADDITIONS
+    # =============================================================================
+
+    def create_multipart_upload(self, key, content_type='application/octet-stream'):
+        '''
+        Initialize a multipart upload and return the upload ID.
+        
+        Args:
+            key (str): The S3 key path for the object
+            content_type (str): MIME type of the file being uploaded
+            
+        Returns:
+            dict: Response from S3 containing UploadId and other metadata
+        '''
+        client = self.get_s3_client()
+        
+        params = {
+            'Bucket': self.bucket_name,
+            'Key': key,
+            'ContentType': content_type,
+            'ACL': self.acl
+        }
+        
+        try:
+            response = client.create_multipart_upload(**params)
+            log.info(f"Created multipart upload for key: {key}, UploadId: {response['UploadId']}")
+            return response
+        except ClientError as e:
+            log.error(f"Error creating multipart upload for key {key}: {str(e)}")
+            raise e
+
+    def generate_multipart_presigned_url(self, key, upload_id, part_number, expires_in=3600):
+        '''
+        Generate a presigned URL for uploading a specific part of a multipart upload.
+        
+        Args:
+            key (str): The S3 key path for the object
+            upload_id (str): The upload ID from create_multipart_upload
+            part_number (int): The part number (1-based)
+            expires_in (int): URL expiration time in seconds
+            
+        Returns:
+            str: Presigned URL for uploading the part
+        '''
+        client = self.get_s3_client()
+        
+        params = {
+            'Bucket': self.bucket_name,
+            'Key': key,
+            'UploadId': upload_id,
+            'PartNumber': part_number
+        }
+        
+        try:
+            url = client.generate_presigned_url(
+                ClientMethod='upload_part',
+                Params=params,
+                ExpiresIn=expires_in
+            )
+            log.debug(f"Generated presigned URL for part {part_number} of upload {upload_id}")
+            return url
+        except ClientError as e:
+            log.error(f"Error generating presigned URL for part {part_number}: {str(e)}")
+            raise e
+
+    def list_multipart_parts(self, key, upload_id, max_parts=1000):
+        '''
+        List all parts that have been uploaded for a multipart upload.
+        
+        Args:
+            key (str): The S3 key path for the object
+            upload_id (str): The upload ID from create_multipart_upload
+            max_parts (int): Maximum number of parts to return
+            
+        Returns:
+            dict: Response from S3 containing Parts array and other metadata
+        '''
+        client = self.get_s3_client()
+        
+        params = {
+            'Bucket': self.bucket_name,
+            'Key': key,
+            'UploadId': upload_id,
+            'MaxParts': max_parts
+        }
+        
+        try:
+            response = client.list_parts(**params)
+            log.debug(f"Listed {len(response.get('Parts', []))} parts for upload {upload_id}")
+            return response
+        except ClientError as e:
+            log.error(f"Error listing parts for upload {upload_id}: {str(e)}")
+            raise e
+
+    def complete_multipart_upload(self, key, upload_id, parts):
+        '''
+        Complete a multipart upload by assembling the uploaded parts.
+        
+        Args:
+            key (str): The S3 key path for the object
+            upload_id (str): The upload ID from create_multipart_upload
+            parts (list): List of part dictionaries with 'PartNumber' and 'ETag'
+            
+        Returns:
+            dict: Response from S3 containing Location, ETag, etc.
+        '''
+        client = self.get_s3_client()
+        
+        # Ensure parts are in the correct format
+        multipart_upload_parts = []
+        for part in parts:
+            if isinstance(part, dict):
+                # Handle both formats: {'PartNumber': 1, 'ETag': 'xxx'} or {'number': 1, 'etag': 'xxx'}
+                part_number = part.get('PartNumber') or part.get('number')
+                etag = part.get('ETag') or part.get('etag')
+                
+                if part_number and etag:
+                    multipart_upload_parts.append({
+                        'PartNumber': int(part_number),
+                        'ETag': etag
+                    })
+        
+        if not multipart_upload_parts:
+            raise ValueError("No valid parts provided for multipart upload completion")
+        
+        # Sort parts by part number to ensure correct order
+        multipart_upload_parts.sort(key=lambda x: x['PartNumber'])
+        
+        params = {
+            'Bucket': self.bucket_name,
+            'Key': key,
+            'UploadId': upload_id,
+            'MultipartUpload': {
+                'Parts': multipart_upload_parts
+            }
+        }
+        
+        try:
+            response = client.complete_multipart_upload(**params)
+            log.info(f"Completed multipart upload for key: {key}, UploadId: {upload_id}")
+            return response
+        except ClientError as e:
+            log.error(f"Error completing multipart upload {upload_id}: {str(e)}")
+            raise e
+
+    def abort_multipart_upload(self, key, upload_id):
+        '''
+        Abort a multipart upload and clean up any uploaded parts.
+        
+        Args:
+            key (str): The S3 key path for the object
+            upload_id (str): The upload ID from create_multipart_upload
+            
+        Returns:
+            dict: Response from S3 (usually empty for successful abort)
+        '''
+        client = self.get_s3_client()
+        
+        params = {
+            'Bucket': self.bucket_name,
+            'Key': key,
+            'UploadId': upload_id
+        }
+        
+        try:
+            response = client.abort_multipart_upload(**params)
+            log.info(f"Aborted multipart upload for key: {key}, UploadId: {upload_id}")
+            return response
+        except ClientError as e:
+            log.error(f"Error aborting multipart upload {upload_id}: {str(e)}")
+            raise e
 
 
 class S3Uploader(BaseS3Uploader):
@@ -442,3 +614,23 @@ def delete_from_bucket(data_dict):
         pass
     except Exception:
         pass
+
+def get_resource_uploader(resource_config):
+    '''
+    Factory function to create the appropriate uploader instance for actions.
+    This matches the expected interface from the actions code.
+    
+    Args:
+        resource_config (dict): Configuration with package_id, resource_id, url_type
+        
+    Returns:
+        BaseS3Uploader: An uploader instance with multipart upload capabilities
+    '''
+    # Create a dummy resource dict for S3ResourceUploader initialization
+    resource_dict = {
+        'id': resource_config.get('resource_id'),
+        'package_id': resource_config.get('package_id')
+    }
+    
+    # Return S3ResourceUploader instance which inherits all multipart methods
+    return S3ResourceUploader(resource_dict)
